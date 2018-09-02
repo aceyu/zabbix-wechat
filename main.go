@@ -153,6 +153,5 @@ func main() {
 		return
 	}
 	token := getToken(msgInfo.Corpid, msgInfo.Corpsecret, msgInfo.Agentid)
-	log.Println("token : ", token)
 	sendMsg(token, msg)
 }
