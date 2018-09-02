@@ -16,8 +16,8 @@ import (
 
 type MsgInfo struct {
 	//消息属性和内容
-	Touser, Toparty, Corpid, Corpsecret, Msg, Url, Log string
-	Agentid                                            int
+	Touser, Toparty, Corpid, Corpsecret, Title, Msg, Url, Log string
+	Agentid                                                   int
 }
 
 var msgInfo MsgInfo
@@ -35,13 +35,13 @@ type TextcardMsg struct {
 }
 
 type WechatMsg struct {
-	Touser  string       `json:"touser"`
-	Toparty string       `json:"toparty"`
-	Totag   string       `json:"totag"`
-	Msgtype string       `json:"msgtype"`
-	Agentid int          `json:"agentid"`
-	Text    *TextcardMsg `json:"textcard"`
-	Safe    int          `json:"safe"`
+	Touser      string       `json:"touser"`
+	Toparty     string       `json:"toparty"`
+	Totag       string       `json:"totag"`
+	Msgtype     string       `json:"msgtype"`
+	Agentid     int          `json:"agentid"`
+	TextcardMsg *TextcardMsg `json:"textcard"`
+	Safe        int          `json:"safe"`
 }
 
 func init() {
@@ -50,6 +50,7 @@ func init() {
 	flag.IntVar(&msgInfo.Agentid, "agentid", 1, "AgentID，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Corpid, "corpid", "", "CorpID，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Corpsecret, "corpsecret", "", "CorpSecret，可以在微信后台查看，不可空。")
+	flag.StringVar(&msgInfo.Title, "title", "监控报警", "消息标题, 不可空。")
 	flag.StringVar(&msgInfo.Msg, "msg", "", "消息体, 不可空。")
 	flag.StringVar(&msgInfo.Url, "url", "http://10.0.1.11/zabbix", "消息内容点击后跳转到的URL，可空。")
 	flag.StringVar(&msgInfo.Log, "log", "/tmp/wechat.log", "日志路径，可空。")
@@ -140,8 +141,8 @@ func main() {
 		Toparty: msgInfo.Toparty,
 		Msgtype: "textcard",
 		Agentid: msgInfo.Agentid,
-		Text: &TextcardMsg{
-			Title:       "告警",
+		TextcardMsg: &TextcardMsg{
+			Title:       msgInfo.Title,
 			Description: msgInfo.Msg,
 			Url:         msgInfo.Url,
 			Btntxt:      "更多",
