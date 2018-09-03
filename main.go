@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -16,16 +17,12 @@ import (
 
 type MsgInfo struct {
 	//消息属性和内容
-	Touser, Toparty, Corpid, Corpsecret, Title, Msg, Url, Log string
-	Agentid                                                   int
+	Touser, Toparty, Corpid, Corpsecret, Msg, Log string
+	Agentid                                       int
 }
 
 var msgInfo MsgInfo
 var filecache cache.Cache
-
-type TextMsg struct {
-	Content string `json:"content"`
-}
 
 type TextcardMsg struct {
 	Title       string `json:"title"`
@@ -50,9 +47,7 @@ func init() {
 	flag.IntVar(&msgInfo.Agentid, "agentid", 1, "AgentID，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Corpid, "corpid", "", "CorpID，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Corpsecret, "corpsecret", "", "CorpSecret，可以在微信后台查看，不可空。")
-	flag.StringVar(&msgInfo.Title, "title", "监控报警", "消息标题, 不可空。")
 	flag.StringVar(&msgInfo.Msg, "msg", "", "消息体, 不可空。")
-	flag.StringVar(&msgInfo.Url, "url", "http://10.0.1.11/zabbix", "消息内容点击后跳转到的URL，可空。")
 	flag.StringVar(&msgInfo.Log, "log", "/tmp/wechat.log", "日志路径，可空。")
 	flag.Parse()
 	filecache, _ = cache.NewCache("file", `{}`)
@@ -136,17 +131,14 @@ func sendMsg(token string, msg []byte) (status bool) {
 }
 
 func main() {
+	log.Printf("来源消息为：%s", msgInfo.Msg)
+	textcardMsg := parseXmlMsg()
 	wm := &WechatMsg{
-		Touser:  msgInfo.Touser,
-		Toparty: msgInfo.Toparty,
-		Msgtype: "textcard",
-		Agentid: msgInfo.Agentid,
-		TextcardMsg: &TextcardMsg{
-			Title:       msgInfo.Title,
-			Description: msgInfo.Msg,
-			Url:         msgInfo.Url,
-			Btntxt:      "更多",
-		},
+		Touser:      msgInfo.Touser,
+		Toparty:     msgInfo.Toparty,
+		Msgtype:     "textcard",
+		Agentid:     msgInfo.Agentid,
+		TextcardMsg: textcardMsg,
 	}
 	msg, err := json.Marshal(wm)
 	if err != nil {
@@ -155,4 +147,44 @@ func main() {
 	}
 	token := getToken(msgInfo.Corpid, msgInfo.Corpsecret, msgInfo.Agentid)
 	sendMsg(token, msg)
+}
+
+type XmlMsg struct {
+	From                   string `xml:"from"`
+	Time                   string `xml:"time"`
+	Level                  string `xml:"level"`
+	Name                   string `xml:"name"`
+	Key                    string `xml:"key"`
+	Value                  string `xml:"value"`
+	Now                    string `xml:"now"`
+	Id                     string `xml:"id"`
+	Ip                     string `xml:"ip"`
+	Url                    string `xml:"url"`
+	Age                    string `xml:"age"`
+	Status                 string `xml:"status"`
+	Acknowledgement        string `xml:"acknowledgement"`
+	Acknowledgementhistory string `xml:"acknowledgementhistory"`
+}
+
+func parseXmlMsg() *TextcardMsg {
+	var xmlMsg XmlMsg
+	err := xml.Unmarshal([]byte(msgInfo.Msg), &xmlMsg)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	description := "<div class=\"gray\">告警级别：%s</div>" +
+		"<div class=\"gray\">故障时间：%s</div><div class=\"gray\">故障时长：%s</div>" +
+		"<div class=\"gray\">IP地址：%s</div>" +
+		"<div class=\"gray\">建成项：%s</div>" +
+		"<div class=\"highlight\">%s</div>" +
+		"<div class=\"gray\">[%s 故障 (%s)]</div>"
+
+	description = fmt.Sprintf(description, xmlMsg.Level, xmlMsg.Time, xmlMsg.Age, xmlMsg.Ip, xmlMsg.Key, xmlMsg.Now, xmlMsg.Ip, xmlMsg.Id)
+	return &TextcardMsg{
+		Title:       xmlMsg.Name,
+		Url:         xmlMsg.Url,
+		Btntxt:      "更多",
+		Description: description,
+	}
 }
