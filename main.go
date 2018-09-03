@@ -17,8 +17,8 @@ import (
 
 type MsgInfo struct {
 	//消息属性和内容
-	Touser, Toparty, Corpid, Corpsecret, Msg, Log string
-	Agentid                                       int
+	Touser, Toparty, Totag, Corpid, Corpsecret, Msg, Log string
+	Agentid                                              int
 }
 
 var msgInfo MsgInfo
@@ -44,6 +44,7 @@ type WechatMsg struct {
 func init() {
 	flag.StringVar(&msgInfo.Touser, "touser", "", "消息的接收人，可以在微信后台查看，可空。")
 	flag.StringVar(&msgInfo.Toparty, "toparty", "", "消息的接收组，可以在微信后台查看，可空。")
+	flag.StringVar(&msgInfo.Totag, "totag", "", "消息的接收组，可以在微信后台查看，可空。")
 	flag.IntVar(&msgInfo.Agentid, "agentid", 1, "AgentID，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Corpid, "corpid", "", "CorpID，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Corpsecret, "corpsecret", "", "CorpSecret，可以在微信后台查看，不可空。")
@@ -136,6 +137,7 @@ func main() {
 	wm := &WechatMsg{
 		Touser:      msgInfo.Touser,
 		Toparty:     msgInfo.Toparty,
+		Totag:       msgInfo.Totag,
 		Msgtype:     "textcard",
 		Agentid:     msgInfo.Agentid,
 		TextcardMsg: textcardMsg,
