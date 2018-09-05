@@ -54,7 +54,7 @@ func init() {
 	filecache, _ = cache.NewCache("file", `{}`)
 	logFile, logErr := os.OpenFile(msgInfo.Log, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if logErr != nil {
-		fmt.Println("Fail to find", *logFile, "Start Failed")
+		fmt.Println("Fail to find ", msgInfo.Log, " Start Failed")
 		os.Exit(1)
 	}
 	log.SetOutput(logFile)
@@ -163,6 +163,7 @@ type XmlMsg struct {
 	Ip                     string `xml:"ip"`
 	Url                    string `xml:"url"`
 	Age                    string `xml:"age"`
+	RecoveryTime           string `xml:"recoveryTime"`
 	Status                 string `xml:"status"`
 	Acknowledgement        string `xml:"acknowledgement"`
 	Acknowledgementhistory string `xml:"acknowledgementhistory"`
@@ -175,14 +176,27 @@ func parseXmlMsg() *TextcardMsg {
 		log.Println(err)
 		return nil
 	}
-	description := "<div class=\"gray\">告警级别：%s</div>" +
-		"<div class=\"gray\">故障时间：%s</div><div class=\"gray\">故障时长：%s</div>" +
-		"<div class=\"gray\">IP地址：%s</div>" +
-		"<div class=\"gray\">建成项：%s</div>" +
-		"<div class=\"highlight\">%s</div>" +
-		"<div class=\"gray\">[%s 故障 (%s)]</div>"
+	var description string
+	if xmlMsg.RecoveryTime == "" || xmlMsg.Status == "PROBLEM" {
+		description = "<div class=\"gray\">告警级别：%s</div>" +
+			"<div class=\"gray\">故障时间：%s</div><div class=\"gray\">故障时长：%s</div>" +
+			"<div class=\"gray\">IP地址：%s</div>" +
+			"<div class=\"gray\">检测项：%s</div>" +
+			"<div class=\"highlight\">%s</div>" +
+			"<div class=\"gray\">[%s 故障 (%s)]</div>"
+		description = fmt.Sprintf(description, xmlMsg.Level, xmlMsg.Time, xmlMsg.Age, xmlMsg.Ip, xmlMsg.Key, xmlMsg.Now, xmlMsg.From, xmlMsg.Id)
 
-	description = fmt.Sprintf(description, xmlMsg.Level, xmlMsg.Time, xmlMsg.Age, xmlMsg.Ip, xmlMsg.Key, xmlMsg.Now, xmlMsg.Ip, xmlMsg.Id)
+	} else if xmlMsg.RecoveryTime != "" || xmlMsg.Status == "OK" {
+		description = "<div class=\"gray\">告警级别：%s</div>" +
+			"<div class=\"gray\">故障时间：%s</div>" +
+			"<div class=\"gray\">恢复时间：%s</div><div class=\"gray\">故障时长：%s</div>" +
+			"<div class=\"gray\">IP地址：%s</div>" +
+			"<div class=\"gray\">检测项：%s</div>" +
+			"<div class=\"highlight\">%s</div>" +
+			"<div class=\"gray\">[%s 恢复 (%s)]</div>"
+		description = fmt.Sprintf(description, xmlMsg.Level, xmlMsg.Time, xmlMsg.RecoveryTime, xmlMsg.Age, xmlMsg.Ip, xmlMsg.Key, xmlMsg.Now, xmlMsg.From, xmlMsg.Id)
+
+	}
 	return &TextcardMsg{
 		Title:       xmlMsg.Name,
 		Url:         xmlMsg.Url,
