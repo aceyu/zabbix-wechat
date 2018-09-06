@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -17,8 +18,8 @@ import (
 
 type MsgInfo struct {
 	//消息属性和内容
-	Touser, Toparty, Totag, Corpid, Corpsecret, Msg, Log string
-	Agentid                                              int
+	Touser, Toparty, Totag, Corpid, Corpsecret, Msg, Log, CachePath string
+	Agentid                                                         int
 }
 
 var msgInfo MsgInfo
@@ -50,8 +51,9 @@ func init() {
 	flag.StringVar(&msgInfo.Corpsecret, "corpsecret", "", "CorpSecret，可以在微信后台查看，不可空。")
 	flag.StringVar(&msgInfo.Msg, "msg", "", "消息体, 不可空。")
 	flag.StringVar(&msgInfo.Log, "log", "/tmp/wechat.log", "日志路径，可空。")
+	flag.StringVar(&msgInfo.CachePath, "cachepath", "/tmp/cache", "缓存路径，可空。")
 	flag.Parse()
-	filecache, _ = cache.NewCache("file", `{}`)
+	filecache, _ = cache.NewCache("file", `{"CachePath":"`+msgInfo.CachePath+`","FileSuffix":".bin","DirectoryLevel":2,"EmbedExpiry":0}`)
 	logFile, logErr := os.OpenFile(msgInfo.Log, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
 	if logErr != nil {
 		fmt.Println("Fail to find ", msgInfo.Log, " Start Failed")
@@ -117,18 +119,41 @@ func sendMsg(token string, msg []byte) (status bool) {
 	url := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=%s", token)
 	res, err := http.Post(url, "application/json;charset=utf-8", body)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return false
 	}
 	result, err := ioutil.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
-		log.Fatal(err)
-		return
+		return false
 	}
 	log.Printf("微信接口返回消息：%s\r\n", result)
+	err = checkRespError(result)
+	if err == errUnmarshall {
+		return true
+	}
+	if err != nil {
+		return false
+	}
+	return true
+}
 
-	return
+type wechatError struct {
+	ErrCode int64  `json:"errcode"`
+	ErrMsg  string `json:"errmsg"`
+}
+
+var errUnmarshall = errors.New("Json Unmarshal Error")
+
+func checkRespError(jsonData []byte) error {
+	var errmsg wechatError
+	if err := json.Unmarshal(jsonData, &errmsg); err != nil {
+		return errUnmarshall
+	}
+	if errmsg.ErrCode != 0 {
+		return fmt.Errorf("Error , errcode=%d , errmsg=%s", errmsg.ErrCode, errmsg.ErrMsg)
+	}
+
+	return nil
 }
 
 func main() {
@@ -147,8 +172,19 @@ func main() {
 		log.Println(err)
 		return
 	}
+	retry := 1
+Do:
 	token := getToken(msgInfo.Corpid, msgInfo.Corpsecret, msgInfo.Agentid)
 	sendMsg(token, msg)
+	if err != nil {
+		if retry > 0 {
+			retry--
+			accessTokenCacheKey := fmt.Sprintf("access_token_%d", msgInfo.Agentid)
+			filecache.Delete(accessTokenCacheKey)
+			goto Do
+		}
+		return
+	}
 }
 
 type XmlMsg struct {
