@@ -18,8 +18,8 @@ import (
 
 type MsgInfo struct {
 	//消息属性和内容
-	Touser, Toparty, Totag, Corpid, Corpsecret, Msg, Log, CachePath string
-	Agentid                                                         int
+	Url, Touser, Toparty, Totag, Corpid, Corpsecret, Msg, Log, CachePath string
+	Agentid                                                              int
 }
 
 var msgInfo MsgInfo
@@ -43,6 +43,7 @@ type WechatMsg struct {
 }
 
 func init() {
+	flag.StringVar(&msgInfo.Url, "url", "https://qyapi.weixin.qq.com", "微信地址。")
 	flag.StringVar(&msgInfo.Touser, "touser", "", "消息的接收人，可以在微信后台查看，可空。")
 	flag.StringVar(&msgInfo.Toparty, "toparty", "", "消息的接收组，可以在微信后台查看，可空。")
 	flag.StringVar(&msgInfo.Totag, "totag", "", "消息的接收组，可以在微信后台查看，可空。")
@@ -81,7 +82,7 @@ func getToken(corpid, corpsecret string, agentid int) (accessToken string) { //�
 
 	//从微信服务器获取
 	var resAccessToken ResAccessToken
-	url := fmt.Sprintf("%s?corpid=%s&corpsecret=%s", "https://qyapi.weixin.qq.com/cgi-bin/gettoken", corpid, corpsecret)
+	url := fmt.Sprintf("%s?corpid=%s&corpsecret=%s", msgInfo.Url+"/cgi-bin/gettoken", corpid, corpsecret)
 	var body []byte
 	response, err := http.Get(url)
 	if err != nil {
@@ -116,7 +117,7 @@ func getToken(corpid, corpsecret string, agentid int) (accessToken string) { //�
 func sendMsg(token string, msg []byte) (status bool) {
 	log.Printf("需要POST的内容：%s\r\n", msg)
 	body := bytes.NewBuffer(msg)
-	url := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=%s", token)
+	url := fmt.Sprintf("%s/cgi-bin/message/send?access_token=%s", msgInfo.Url, token)
 	res, err := http.Post(url, "application/json;charset=utf-8", body)
 	if err != nil {
 		return false
